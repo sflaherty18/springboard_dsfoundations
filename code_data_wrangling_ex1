@@ -1,0 +1,67 @@
+library(dplyr, tidyr)
+
+Refine_Original <-"~/Desktop/refine_original.csv" 
+data <- read.csv(file=Refine_Original, header=TRUE, sep=",")
+
+data <- tbl_df(data)
+
+#functions to be used for wrangling
+cleancos <- function(company) {
+  if (endsWith(company, 's'))
+  return("philips")
+  else if (startsWith(company, 'a') | startsWith(company, 'A'))
+  return("akzo")
+  else if (startsWith(company, "u") | startsWith(company, "U"))
+  return("unilever")
+  else return("van houten")
+}
+
+
+
+splitproduct <- function(x, index) {
+  unlist(strsplit(x, '-'))[index]
+}
+
+createcategory <- function(code) {
+  switch(code, 
+         p = "Smartphone",
+         v = "TV",
+         x = "Laptop",
+         q = "Tablet",
+         code)
+}
+  
+#adds some new columns that will eventually be populated
+data <- mutate(data, product_code=Product.code...number, product_number = Product.code...number, category = product_code, full_address=' ')
+
+#should clean up typos and other mistakes in company names
+data$company <- sapply(as.vector(data$company), cleancos)
+
+#fixing the new product code and number columns
+data$product_code <- sapply(as.vector(data$product_code), splitproduct, 1)
+data$product_number <- sapply(as.vector(data$product_number), splitproduct, 2)
+
+#filling the category column
+data$category <- sapply(as.vector(data$product_code), createcategory)
+
+#filling full address column
+data$full_address <- paste(data$address, data$city, data$country, sep = ', ')
+
+#hiding duplicative columns
+data <- select(data, -Product.code...number, -address, -city, -country)
+
+#creating columns for dummy variables
+data <- mutate(data, company_akzo="", company_philips="", company_van_houten="", company_unilever="", product_smartphone="", product_laptop="", product_tablet="")
+
+#populating the dummy variable columns
+data <- data %>%
+  mutate(company_akzo = ifelse(company == "akzo", 1, 0)) %>% 
+  mutate(company_philips = ifelse(company == "philips", 1, 0)) %>% 
+  mutate(company_unilever = ifelse(company == "unilever", 1, 0)) %>% 
+  mutate(company_van_houten = ifelse(company == "van houten", 1, 0)) %>% 
+  mutate(product_laptop = ifelse(category == "Laptop", 1, 0)) %>% 
+  mutate(product_smartphone = ifelse(category == "Smartphone", 1, 0)) %>% 
+  mutate(product_tablet = ifelse(category == "Tablet", 1, 0))
+
+refine_clean <- data
+write.csv(refine_clean, file = "~/Desktop/refine_clean.csv")
